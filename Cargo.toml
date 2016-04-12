@@ -1,0 +1,12 @@
+[package]
+name = "mpirs"
+version = "0.1.0"
+authors = ["Sushant <sushant.dinesh94@gmail.com>"]
+
+[[bin]]
+name = "mpiun"
+path = "mpirun/main.rs"
+
+[dependencies]
+docopt = "0.6"
+rustc-serialize = "*"
