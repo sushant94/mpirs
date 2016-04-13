@@ -6,6 +6,8 @@ pub mod mpi_datatype;
 pub mod mpi_comm;
 pub mod mpi_request;
 pub mod comm_request;
+pub mod receiver_traits;
+
 
 pub mod send;
 pub mod wait;

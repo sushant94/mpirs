@@ -1,18 +1,20 @@
-use rustc_serialize::base64;
+use rustc_serialize::Decodable;
 use mpi_datatype::MPIDatatype;
 use mpi_comm::MPIComm;
-use mpi_request::MPIRequest;
-use std::sync::Arc;
+use comm_request::CommRequest;
+use std::sync::mpsc::{Sender, Receiver};
+use receiver_traits::Message;
 
 // Functions in the Receive module
-pub fn mpi_irecv<'a, T: AsRef<&'a [u8]>>(count: u64, datatype: MPIDatatype,
-			 dest: usize, tag: u64, comm: MPIComm, request: &mut MPIRequest) -> Arc<T> {
+pub fn mpi_irecv<T: Decodable>(buf: &mut T, count: u64, datatype: MPIDatatype,
+			 dest: usize, tag: u64, comm: MPIComm) -> Receiver<CommRequest> {
 
 	unimplemented!();
-	// let data = base64::from_base64();
 }
 
-pub fn mpi_recv<'a, T: AsRef<&'a [u8]>>(count: u64, datatype: MPIDatatype,
-			 dest: usize, tag: u64, comm: MPIComm) -> Arc<T> {
-	unimplemented!();
+pub fn mpi_recv<T: Decodable>(buf: &mut T, count: u64, datatype: MPIDatatype,
+			 dest: usize, tag: u64, comm: MPIComm) {
+	
+	let mut rx: Receiver<CommRequest> = mpi_irecv(buf, count, datatype, dest, tag, comm);
+	*buf = rx.wait();
 }
