@@ -2,6 +2,7 @@
 
 extern crate docopt;
 extern crate rustc_serialize;
+extern crate mpirs;
 
 use std::thread;
 use std::process::{Command, Stdio};
@@ -14,7 +15,11 @@ use std::os::unix::io::FromRawFd;
 use std::fs::File;
 use std::io::Write;
 
+use rustc_serialize::json;
+
 use docopt::Docopt;
+
+use mpirs::comm_request::CommRequest;
 
 static USAGE: &'static str = "
 mpirs. Run MPI Programs in rust.
@@ -32,17 +37,17 @@ Options:
 #[derive(Debug, RustcDecodable)]
 struct Args {
     arg_executable: String,
-    flag_num: Option<u64>,
+    flag_num: Option<usize>,
 }
 
-fn spawn_process(send_channel: Sender<String>, send_fd: Sender<RawFd>, bin: String) {
+fn spawn_process(send_channel: Sender<CommRequest>, send_fd: Sender<RawFd>, bin: String, rank: usize) {
     let mut child = Command::new(bin)
                         .stdin(Stdio::piped())
                         .stdout(Stdio::piped())
                         .spawn()
                         .expect("Failed to spawn process!");
 
-    send_fd.send(child.stdin.unwrap().into_raw_fd());
+    send_fd.send(child.stdin.unwrap().into_raw_fd()).expect("Failed to forward fd");
 
     loop {
         let mut bytes_read = [0; 2048];
@@ -59,7 +64,9 @@ fn spawn_process(send_channel: Sender<String>, send_fd: Sender<RawFd>, bin: Stri
         }
         // Work with the string in str_in.
         if !str_in.is_empty() {
-            send_channel.send(str_in.clone()).expect("Send Error:");
+            let mut req: CommRequest = json::decode(&str_in).expect("Invalid Json!");
+            req.src = Some(rank);
+            send_channel.send(req).expect("Send Error:");
         }
     }
 }
@@ -75,17 +82,16 @@ fn main() {
     let (tx_fd, rx_fd) = mpsc::channel();
 
     // Code to spawn thread and process here.
-    for _ in 0..num_procs {
+    for i in 0..num_procs {
         let tx_ = tx.clone();
         let bin_ = bin.clone();
         let tx_fd_ = tx_fd.clone();
         thread::spawn(move || {
-            spawn_process(tx_, tx_fd_, bin_);
+            spawn_process(tx_, tx_fd_, bin_, i);
         });
     }
 
     let mut proc_stdin = Vec::new();
-
     for _ in 0..num_procs {
         let fd = rx_fd.recv().expect("fd Recv error");
         unsafe {
@@ -93,13 +99,11 @@ fn main() {
         }
     }
 
-    //loop {
-        for (i, message) in rx.iter().enumerate() {
-            // Perform some action on the buffer.
-            println!("{}", message);
-            if i < num_procs as usize {
-                proc_stdin[i].write("Hello_back_at_you!\n".as_bytes());
-            }
-        }
-    //}
+    for message in rx.iter() {
+        // Perform some action on the buffer.
+        let dest = message.dest().unwrap();
+        assert!(dest < num_procs);
+        let message_json = json::encode(&message).unwrap();
+        proc_stdin[dest].write(&message_json.as_bytes()).expect("Write to proc failed:");
+    }
 }
