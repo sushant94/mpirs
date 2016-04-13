@@ -5,20 +5,22 @@ use comm_request::CommRequest;
 use comm_request::CommRequestType;
 use std::sync::mpsc::{Sender, Receiver};
 use receiver_traits::Message;
+use std::fmt::Debug;
+use rustc_serialize::Encodable;
 
 const MPI_RS: usize = 0;
 
 // Functions in the Send module
-pub fn mpi_isend<T: ToJson>(buf: T, count: u64, datatype: MPIDatatype,
-			 dest: usize, tag: u64, comm: MPIComm) -> Receiver<CommRequest> {
+pub fn mpi_isend<T: Debug + Clone + Encodable>(buf: T, count: u64, datatype: MPIDatatype,
+			 dest: usize, tag: u64, comm: MPIComm) -> Receiver<CommRequest<T>> {
 
 	unimplemented!();
 }
 
-pub fn mpi_send<T: ToJson>(buf: T, count: u64, datatype: MPIDatatype,
+pub fn mpi_send<T: Debug + Clone + Encodable>(buf: T, count: u64, datatype: MPIDatatype,
 			 dest: usize, tag: u64, comm: MPIComm) {
 
-	let mut rx: Receiver<CommRequest> = mpi_isend(buf, count, datatype, dest, tag, comm);
+	let mut rx: Receiver<CommRequest<T>> = mpi_isend(buf, count, datatype, dest, tag, comm);
 	rx.wait();
 
 }
