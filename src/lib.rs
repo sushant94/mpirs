@@ -14,3 +14,4 @@ pub mod wait;
 pub mod receive;
 pub mod bcast;
 pub mod comm_rank;
+pub mod scatter;
