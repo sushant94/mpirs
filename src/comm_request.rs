@@ -11,9 +11,15 @@ use std::fmt::Debug;
 #[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable)]
 pub enum CommRequestType {
     /// Message from one process to another
-    Message,
+    Message(MType),
     /// Message querying mpirun
     Control(ControlTy),
+}
+
+#[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable)]
+pub enum MType {
+    MSend,
+    MRecv,
 }
 
 /// Information requested from mpirun
@@ -81,23 +87,43 @@ impl<T: Debug + Clone + Encodable> CommRequest<T> {
     }
 
     pub fn is_send(&self) -> bool {
-        unimplemented!()
+        if let CommRequestType::Message(MType::MSend) = self.req_ty {
+            true
+        } else {
+            false
+        }
     }
 
     pub fn is_recv(&self) -> bool {
-        unimplemented!()
+        if let CommRequestType::Message(MType::MRecv) = self.req_ty {
+            true
+        } else {
+            false
+        }
     }
 
     pub fn is_src_any(&self) -> bool {
-        unimplemented!()
+        if let Some(RequestProc::Any) = self.src {
+            true
+        } else {
+            false
+        }
     }
 
     pub fn is_dst_any(&self) -> bool {
-        unimplemented!()
+        if let Some(RequestProc::Any) = self.dest {
+            true
+        } else {
+            false
+        }
     }
 
     pub fn is_request_control(&self) -> bool {
-        unimplemented!()
+        if let CommRequestType::Control(_) = self.req_ty {
+            true
+        } else {
+            false
+        }
     }
 
     pub fn is_request_message(&self) -> bool {

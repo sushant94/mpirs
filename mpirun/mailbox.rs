@@ -124,7 +124,7 @@ impl Mailbox {
         }
     }
 
-    pub fn insert_mail<T>(&mut self, mail: Mail, req: &CommRequest<T>, port: usize)
+    pub fn insert_mail<T>(&mut self, req: &CommRequest<T>, port: usize)
         where T: Debug + Clone + Encodable
     {
         let mtype = if req.is_send() {
@@ -146,7 +146,7 @@ impl Mailbox {
         if let Some(ref mut v) = self.h1.get_mut(&h1_key) {
             v.push_back(mail.clone());
         }
-        
+
         if !self.h2.contains_key(&h2_key) {
             self.h2.insert(h2_key, VecDeque::new());
         }
@@ -198,8 +198,12 @@ impl Mailbox {
         let mut found: Option<Mail> = None;
 
         loop {
-            if k >= v3.len() { break; }
-            if i >= v1.len() && j >= v2.len() { break; }
+            if k >= v3.len() {
+                break;
+            }
+            if i >= v1.len() && j >= v2.len() {
+                break;
+            }
 
             if i < v1.len() {
                 if v1[i] < v3[k] {
@@ -235,7 +239,7 @@ impl Mailbox {
     }
 
     fn fast_first_union(&mut self, keys: Vec<KT>) -> Option<Mail> {
-        let (e, v1_, v2_) = { 
+        let (e, v1_, v2_) = {
             let v1 = get_value!(self, keys[0]);
             let v2 = get_value!(self, keys[1]);
 
@@ -254,13 +258,21 @@ impl Mailbox {
                 (Some(e), Some(e_)) => {
                     let mut vec1 = e.clone();
                     let mut vec2 = e_.clone();
-                    let ele = match vec1[0].cmp(&vec2[0]) {
-                        Ordering::Less => vec1.pop_front(),
-                        Ordering::Greater => vec2.pop_front(),
-                        Ordering::Equal => unreachable!(),
+                    let ele = if vec1.is_empty() && vec2.is_empty() {
+                        None
+                    } else if vec1.is_empty() {
+                        vec2.pop_front()
+                    } else if vec2.is_empty() {
+                        vec1.pop_front()
+                    } else {
+                        match vec1[0].cmp(&vec2[0]) {
+                            Ordering::Less => vec1.pop_front(),
+                            Ordering::Greater => vec2.pop_front(),
+                            Ordering::Equal => unreachable!(),
+                        }
                     };
                     (ele, Some(vec1), Some(vec2))
-                },
+                }
             }
         };
         if v1_.is_some() {
@@ -270,5 +282,195 @@ impl Mailbox {
             insert_value!(self, keys[1], v2_.unwrap());
         }
         e
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use mpirs::comm_request::{CommRequest, CommRequestType, MType, RequestProc};
+
+    const COMM_TAG: u64 = 42;
+
+    #[test]
+    fn box_insert_get_proc_to_proc() {
+        let mut mailbox = Mailbox::new();
+        let req = CommRequest::new(Some(RequestProc::Process(0)),
+                                   Some(RequestProc::Process(1)),
+                                   COMM_TAG,
+                                   5u64,
+                                   CommRequestType::Message(MType::MSend));
+
+        let req_recv = CommRequest::new(Some(RequestProc::Process(0)),
+                                        Some(RequestProc::Process(1)),
+                                        COMM_TAG,
+                                        5u64,
+                                        CommRequestType::Message(MType::MRecv));
+
+        mailbox.insert_mail(&req, 31337);
+        assert!(mailbox.pop_matching_mail(&req_recv).is_some());
+    }
+
+    #[test]
+    fn box_insert_get_proc_to_any() {
+        let mut mailbox = Mailbox::new();
+        let req = CommRequest::new(Some(RequestProc::Process(0)),
+                                   Some(RequestProc::Process(1)),
+                                   COMM_TAG,
+                                   5u64,
+                                   CommRequestType::Message(MType::MSend));
+
+        let req_recv = CommRequest::new(Some(RequestProc::Any),
+                                        Some(RequestProc::Process(1)),
+                                        COMM_TAG,
+                                        5u64,
+                                        CommRequestType::Message(MType::MRecv));
+
+        mailbox.insert_mail(&req, 31337);
+        assert!(mailbox.pop_matching_mail(&req_recv).is_some());
+    }
+
+    #[test]
+    fn box_insert_get_any_to_proc() {
+        let mut mailbox = Mailbox::new();
+        let req = CommRequest::new(Some(RequestProc::Process(0)),
+                                   Some(RequestProc::Any),
+                                   COMM_TAG,
+                                   5u64,
+                                   CommRequestType::Message(MType::MSend));
+
+        let req_recv = CommRequest::new(Some(RequestProc::Process(0)),
+                                        Some(RequestProc::Process(1)),
+                                        COMM_TAG,
+                                        5u64,
+                                        CommRequestType::Message(MType::MRecv));
+
+        mailbox.insert_mail(&req, 31337);
+        assert!(mailbox.pop_matching_mail(&req_recv).is_some());
+    }
+
+    #[test]
+    fn box_insert_get_any_to_any() {
+        let mut mailbox = Mailbox::new();
+        let req = CommRequest::new(Some(RequestProc::Process(0)),
+                                   Some(RequestProc::Any),
+                                   COMM_TAG,
+                                   5u64,
+                                   CommRequestType::Message(MType::MSend));
+
+        let req_recv = CommRequest::new(Some(RequestProc::Any),
+                                        Some(RequestProc::Process(1)),
+                                        COMM_TAG,
+                                        5u64,
+                                        CommRequestType::Message(MType::MRecv));
+
+        mailbox.insert_mail(&req, 31337);
+        assert!(mailbox.pop_matching_mail(&req_recv).is_some());
+    }
+
+    #[test]
+    fn box_proc_2_recv_any() {
+        let mut mailbox = Mailbox::new();
+        let req = CommRequest::new(Some(RequestProc::Process(0)),
+                                   Some(RequestProc::Process(2)),
+                                   COMM_TAG,
+                                   5u64,
+                                   CommRequestType::Message(MType::MSend));
+
+        let req_recv = CommRequest::new(Some(RequestProc::Any),
+                                        Some(RequestProc::Process(1)),
+                                        COMM_TAG,
+                                        5u64,
+                                        CommRequestType::Message(MType::MRecv));
+
+        mailbox.insert_mail(&req, 31337);
+        assert!(mailbox.pop_matching_mail(&req_recv).is_none());
+    }
+
+    #[test]
+    fn box_inorder() {
+        let mut mailbox = Mailbox::new();
+        let req = CommRequest::new(Some(RequestProc::Process(0)),
+                                   Some(RequestProc::Process(1)),
+                                   COMM_TAG,
+                                   5u64,
+                                   CommRequestType::Message(MType::MSend));
+
+        let req_1 = CommRequest::new(Some(RequestProc::Process(0)),
+                                   Some(RequestProc::Any),
+                                   COMM_TAG,
+                                   5u64,
+                                   CommRequestType::Message(MType::MSend));
+
+        let req_recv = CommRequest::new(Some(RequestProc::Any),
+                                        Some(RequestProc::Process(1)),
+                                        COMM_TAG,
+                                        5u64,
+                                        CommRequestType::Message(MType::MRecv));
+
+        mailbox.insert_mail(&req, 31337);
+        mailbox.insert_mail(&req_1, 31337);
+
+        let rep = mailbox.pop_matching_mail(&req_recv);
+        assert!(rep.is_some());
+        assert_eq!(rep.unwrap().id, 0);
+    }
+    
+    #[test]
+    fn box_inorder_multiple() {
+        let mut mailbox = Mailbox::new();
+        let req = CommRequest::new(Some(RequestProc::Process(0)),
+                                   Some(RequestProc::Process(1)),
+                                   COMM_TAG,
+                                   5u64,
+                                   CommRequestType::Message(MType::MSend));
+
+        let req_1 = CommRequest::new(Some(RequestProc::Process(0)),
+                                   Some(RequestProc::Any),
+                                   COMM_TAG,
+                                   5u64,
+                                   CommRequestType::Message(MType::MSend));
+
+        let req_recv = CommRequest::new(Some(RequestProc::Any),
+                                        Some(RequestProc::Process(1)),
+                                        COMM_TAG,
+                                        5u64,
+                                        CommRequestType::Message(MType::MRecv));
+
+        mailbox.insert_mail(&req, 31337);
+        mailbox.insert_mail(&req_1, 31337);
+
+        let rep = mailbox.pop_matching_mail(&req_recv);
+        assert!(rep.is_some());
+        assert_eq!(rep.unwrap().id, 0);
+
+        let rep = mailbox.pop_matching_mail(&req_recv);
+        assert!(rep.is_some());
+        assert_eq!(rep.unwrap().id, 1);
+
+        assert!(mailbox.pop_matching_mail(&req_recv).is_none());
+    }
+
+    #[test]
+    fn box_recv_before_send() {
+        let mut mailbox = Mailbox::new();
+        let req = CommRequest::new(Some(RequestProc::Process(0)),
+                                   Some(RequestProc::Process(1)),
+                                   COMM_TAG,
+                                   5u64,
+                                   CommRequestType::Message(MType::MSend));
+
+        let req_recv = CommRequest::new(Some(RequestProc::Any),
+                                        Some(RequestProc::Process(1)),
+                                        COMM_TAG,
+                                        5u64,
+                                        CommRequestType::Message(MType::MRecv));
+
+
+        mailbox.insert_mail(&req_recv, 31337);
+        let rep = mailbox.pop_matching_mail(&req);
+        assert!(rep.is_some());
+        assert_eq!(rep.unwrap().id, 0);
+        assert!(mailbox.pop_matching_mail(&req).is_none());
     }
 }
