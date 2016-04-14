@@ -23,7 +23,7 @@ pub enum ControlTy {
     GetMyRank,
 }
 
-#[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable, PartialEq, Eq, Hash)]
 pub enum RequestProc {
     /// Basic point-to-point message send / recv
     Process(usize),
@@ -35,7 +35,7 @@ pub enum RequestProc {
 pub struct CommRequest<T: Debug + Clone + Encodable> {
     /// Filled in by mpirun automatically. Not set by the sending process
     src: Option<RequestProc>,
-    dest: RequestProc,
+    dest: Option<RequestProc>,
     /// Message Tag
     tag: u64,
     /// Actual data to be sent
@@ -44,28 +44,9 @@ pub struct CommRequest<T: Debug + Clone + Encodable> {
     req_ty: CommRequestType,
 }
 
-// Implementing Hash on CommRequest. This allows for faster manipulations and comparisons in mpirs
-impl<T: Debug + Clone + Encodable> hash::Hash for CommRequest<T> {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.src.unwrap().hash(state);
-        self.dest.hash(state);
-        self.tag.hash(state);
-    }
-}
-
-impl hash::Hash for RequestProc {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        match *self {
-            RequestProc::Process(target) => target.hash(state),
-            RequestProc::Any => (0xffffffffffffffffu64).hash(state),
-        }
-    }
-}
-
-
 impl<T: Debug + Clone + Encodable> CommRequest<T> {
     pub fn new(src: Option<RequestProc>,
-               dest: RequestProc,
+               dest: Option<RequestProc>,
                tag: u64,
                data: T,
                ty: CommRequestType)
@@ -83,7 +64,7 @@ impl<T: Debug + Clone + Encodable> CommRequest<T> {
         self.src
     }
 
-    pub fn dest(&self) -> RequestProc {
+    pub fn dst(&self) -> Option<RequestProc> {
         self.dest
     }
 
@@ -97,6 +78,30 @@ impl<T: Debug + Clone + Encodable> CommRequest<T> {
 
     pub fn set_source(&mut self, src: RequestProc) {
         self.src = Some(src)
+    }
+
+    pub fn is_send(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn is_recv(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn is_src_any(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn is_dst_any(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn is_request_control(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn is_request_message(&self) -> bool {
+        !self.is_request_control()
     }
 }
 
