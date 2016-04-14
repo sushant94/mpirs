@@ -14,8 +14,8 @@ use mpirs::comm_request::{CommRequest, RequestProc};
 macro_rules! get_value {
     ($m: ident, $k: expr) => {
         match $k {
-            KT::H1(ref k) => $m.h1.get(k).clone(),
-            KT::H2(ref k) => $m.h2.get(k).clone(),
+            KT::H1(ref k) => $m.h1.get(k).cloned(),
+            KT::H2(ref k) => $m.h2.get(k).cloned(),
         }
     }
 }
@@ -187,7 +187,51 @@ impl Mailbox {
     }
 
     fn fast_first_union_intersect(&mut self, keys: Vec<KT>) -> Option<Mail> {
-        unimplemented!()
+        let mut v1 = get_value!(self, keys[0]).unwrap_or(VecDeque::new());
+        let mut v2 = get_value!(self, keys[1]).unwrap_or(VecDeque::new());
+        let mut v3 = get_value!(self, keys[2]).unwrap_or(VecDeque::new());
+
+        let mut i: usize = 0;
+        let mut j: usize = 0;
+        let mut k: usize = 0;
+
+        let mut found: Option<Mail> = None;
+
+        loop {
+            if k >= v3.len() { break; }
+            if i >= v1.len() && j >= v2.len() { break; }
+
+            if i < v1.len() {
+                if v1[i] < v3[k] {
+                    i += 1;
+                } else if v1[i] == v3[k] {
+                    found = v1.remove(i);
+                    v3.remove(k);
+                    break;
+                }
+            }
+
+            if j < v2.len() {
+                if v2[j] < v3[k] {
+                    j += 1;
+                } else if v2[j] == v3[k] {
+                    found = v2.remove(j);
+                    v3.remove(k);
+                    break;
+                }
+            }
+
+            if i < v1.len() && j < v2.len() {
+                if v1[i] > v3[k] && v2[j] > v3[k] {
+                    k += 1;
+                }
+            }
+        }
+
+        insert_value!(self, keys[0], v1);
+        insert_value!(self, keys[1], v2);
+        insert_value!(self, keys[2], v3);
+        found
     }
 
     fn fast_first_union(&mut self, keys: Vec<KT>) -> Option<Mail> {
