@@ -10,3 +10,4 @@ path = "mpirun/main.rs"
 [dependencies]
 docopt = "0.6"
 rustc-serialize = "*"
+libc = "*"
