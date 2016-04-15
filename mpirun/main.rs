@@ -71,8 +71,6 @@ fn main() {
 
     for i in 0..num_procs {
         let child = Command::new(&bin)
-                            .stdin(Stdio::piped())
-                            .stdout(Stdio::piped())
                             .spawn()
                             .expect("Failed to spawn process!");
 
@@ -85,6 +83,7 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(mut stream) => {
+                println!("GOT STREAM");
                 let json = read_from_stream(&mut stream);
                 let mut req: CommRequest<String> = json::decode(&json).expect("Invalid json");
                 if let CommRequestType::Control(ref ctrl) = req.req_type() {

@@ -158,6 +158,6 @@ pub trait Extract {
 impl<T: Clone + Debug + Encodable> Extract for CommRequest<T> {
     type DType = T;
     fn data(&self) -> Self::DType {
-        self.data.as_ref().unwrap().clone()
+        self.data.as_ref().expect("No data found!").clone()
     }
 }
