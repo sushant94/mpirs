@@ -14,15 +14,8 @@ extern crate mpirs;
 
 mod mailbox;
 
-use std::thread;
 use std::process::{Command, Stdio};
 use std::io::Read;
-use std::sync::mpsc;
-use std::sync::mpsc::Sender;
-use std::os::unix::io::RawFd;
-use std::os::unix::io::IntoRawFd;
-use std::os::unix::io::FromRawFd;
-use std::fs::File;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 use std::collections::HashMap;
@@ -31,7 +24,8 @@ use rustc_serialize::json;
 
 use docopt::Docopt;
 
-use mpirs::comm_request::{CommRequest, CommRequestType, ControlTy};
+use mpirs::comm_request::{CommRequest, CommRequestType, ControlTy, RequestProc};
+use mailbox::Mailbox;
 
 static USAGE: &'static str = "
 mpirs. Run MPI Programs in rust.
@@ -52,31 +46,13 @@ struct Args {
     flag_num: Option<usize>,
 }
 
-//fn spawn_process(send_channel: Sender<CommRequest>, send_fd: Sender<RawFd>, bin: String, rank: usize) {
-    //let mut child = Command::new(bin)
-                        //.stdin(Stdio::piped())
-                        //.stdout(Stdio::piped())
-                        //.spawn()
-                        //.expect("Failed to spawn process!");
-
-    //send_fd.send(child.stdin.unwrap().into_raw_fd()).expect("Failed to forward fd");
-
-
-        //// Work with the string in str_in.
-        //if !str_in.is_empty() {
-            //let mut req: CommRequest = json::decode(&str_in).expect("Invalid Json!");
-            //req.src = Some(rank);
-            //send_channel.send(req).expect("Send Error:");
-        //}
-    //}
-//}
-
 fn read_from_stream(stream: &mut TcpStream) -> String {
     let mut bytes_read = [0; 2048];
     let mut str_in = String::new();
     loop {
         let n = stream.read(&mut bytes_read).expect("Read Error:");
-        str_in = format!("{}{}", str_in,
+        str_in = format!("{}{}",
+                         str_in,
                          String::from_utf8(bytes_read[0..n].to_vec()).unwrap());
         if n < 2048 {
             break;
@@ -94,16 +70,17 @@ fn main() {
     let mut rank_map = HashMap::new();
 
     for i in 0..num_procs {
-        let mut child = Command::new(&bin)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .expect("Failed to spawn process!");
+        let child = Command::new(&bin)
+                            .stdin(Stdio::piped())
+                            .stdout(Stdio::piped())
+                            .spawn()
+                            .expect("Failed to spawn process!");
 
         rank_map.insert(child.id(), i);
     }
 
     let listener = TcpListener::bind("127.0.0.1:31337").unwrap();
+    let mut mailbox = Mailbox::new();
 
     for stream in listener.incoming() {
         match stream {
@@ -112,47 +89,63 @@ fn main() {
                 let mut req: CommRequest<String> = json::decode(&json).expect("Invalid json");
                 if let CommRequestType::Control(ref ctrl) = req.req_type() {
                     match *ctrl {
-                        ControlTy::GetMyRank => unimplemented!(),
+                        ControlTy::GetMyRank => {
+                            let to_send = format!("{}", rank_map[&req.pid()]);
+                            stream.write(to_send.as_bytes());
+                        }
+                        ControlTy::NumProcs => {
+                            let to_send = format!("{}", rank_map.keys().len());
+                            stream.write(to_send.as_bytes());
+                        }
+                        _ => panic!("Invalid control request from process"),
                     }
                     continue;
                 }
 
+                if req.is_send() {
+                    let pid = req.pid();
+                    req.set_src(RequestProc::Process(rank_map[&pid]))
+                } else {
+                    let pid = req.pid();
+                    req.set_dest(RequestProc::Process(rank_map[&pid]))
+                }
 
-
-
+                if let Some((ref mail, ref mut stream_r)) = mailbox.pop_matching_mail(&req) {
+                    match req.is_send() {
+                        true => {
+                            stream_r.write(&json::encode(&req)
+                                                .expect("json encode failed!")
+                                                .as_bytes());
+                            let ack =
+                                CommRequest::<u32>::new(None,
+                                                        None,
+                                                        u64::max_value(),
+                                                        None,
+                                                        CommRequestType::Control(ControlTy::Ack),
+                                                        0);
+                            stream.write(&json::encode(&ack)
+                                              .expect("json encode failed!")
+                                              .as_bytes());
+                        }
+                        false => {
+                            stream.write(mail.req.as_bytes());
+                            let ack =
+                                CommRequest::<u32>::new(None,
+                                                        None,
+                                                        u64::max_value(),
+                                                        None,
+                                                        CommRequestType::Control(ControlTy::Ack),
+                                                        0);
+                            stream_r.write(&json::encode(&ack)
+                                                .expect("json encode failed!")
+                                                .as_bytes());
+                        }
+                    }
+                } else {
+                    mailbox.insert_mail(&req, &stream);
+                }
             }
-            Err(e) => {
-            }
+            Err(e) => {}
         }
     }
-
-    // Create n channels to listen on for the master thread
-    //let (tx, rx) = mpsc::channel();
-    //let (tx_fd, rx_fd) = mpsc::channel();
-
-    // Code to spawn thread and process here.
-    //for i in 0..num_procs {
-        //let tx_ = tx.clone();
-        //let bin_ = bin.clone();
-        //let tx_fd_ = tx_fd.clone();
-        //thread::spawn(move || {
-            //spawn_process(tx_, tx_fd_, bin_, i);
-        //});
-    //}
-
-    //let mut proc_stdin = Vec::new();
-    //for _ in 0..num_procs {
-        //let fd = rx_fd.recv().expect("fd Recv error");
-        //unsafe {
-            //proc_stdin.push(File::from_raw_fd(fd));
-        //}
-    //}
-
-    //for message in rx.iter() {
-        //// Perform some action on the buffer.
-        //let dest = message.dest().unwrap();
-        //assert!(dest < num_procs);
-        //let message_json = json::encode(&message).unwrap();
-        //proc_stdin[dest].write(&message_json.as_bytes()).expect("Write to proc failed:");
-    //}
 }

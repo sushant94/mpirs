@@ -27,6 +27,10 @@ pub enum MType {
 pub enum ControlTy {
     /// Get rank of the process in the communicator
     GetMyRank,
+    /// Get number of processes
+    NumProcs,
+    /// Acknowledge a send when recv is successful
+    Ack,
 }
 
 #[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable, PartialEq, Eq, Hash)]
@@ -89,8 +93,16 @@ impl<T: Debug + Clone + Encodable> CommRequest<T> {
         self.req_ty
     }
 
-    pub fn set_source(&mut self, src: RequestProc) {
+    pub fn pid(&self) -> u32 {
+        self.pid
+    }
+
+    pub fn set_src(&mut self, src: RequestProc) {
         self.src = Some(src)
+    }
+
+    pub fn set_dest(&mut self, dst: RequestProc) {
+        self.dest = Some(dst)
     }
 
     pub fn is_send(&self) -> bool {

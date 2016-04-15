@@ -4,6 +4,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
 use std::cmp::Ordering;
+use std::net::TcpStream;
 
 use rustc_serialize::Encodable;
 use rustc_serialize::json;
@@ -69,17 +70,17 @@ enum KT {
 #[derive(Clone, Debug)]
 pub struct Mail {
     id: usize,
-    port: usize,
-    req: String,
+    // stream: Option<TcpStream>,
+    pub req: String,
 }
 
 impl Mail {
-    pub fn new<T>(id: usize, port: usize, req: &CommRequest<T>) -> Mail
+    pub fn new<T>(id: usize, req: &CommRequest<T>) -> Mail
         where T: Debug + Clone + Encodable
     {
         Mail {
             id: id,
-            port: port,
+            // stream: stream,
             req: json::encode(req).unwrap(),
         }
     }
@@ -105,11 +106,12 @@ impl Ord for Mail {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Mailbox {
     h1: HashMap<MailboxKey, VecDeque<Mail>>,
     h2: HashMap<MailboxKey, VecDeque<Mail>>,
     id: usize,
+    stream_map: HashMap<usize, TcpStream>,
 }
 
 impl Mailbox {
@@ -118,21 +120,38 @@ impl Mailbox {
             id: 0,
             h1: HashMap::new(),
             h2: HashMap::new(),
+            stream_map: HashMap::new(),
         }
     }
 
-    pub fn pop_matching_mail<T>(&mut self, req: &CommRequest<T>) -> Option<Mail>
+    pub fn pop_matching_mail<T>(&mut self, req: &CommRequest<T>) -> Option<(Mail, TcpStream)>
         where T: Debug + Clone + Encodable
     {
         let keys = Mailbox::mirror_keys(req);
         match keys.len() {
-            2 => self.fast_first_union(keys),
-            3 => self.fast_first_union_intersect(keys),
+            2 => {
+                let mail = self.fast_first_union(keys);
+                if let Some(mail_) = mail {
+                    let tcp_stream = self.stream_map.remove(&mail_.id).unwrap();
+                    Some((mail_, tcp_stream))
+                } else {
+                    None
+                }
+            }
+            3 => {
+                let mail = self.fast_first_union_intersect(keys);
+                if let Some(mail_) = mail {
+                    let tcp_stream = self.stream_map.remove(&mail_.id).unwrap();
+                    Some((mail_, tcp_stream))
+                } else {
+                    None
+                }
+            }
             _ => unreachable!(),
         }
     }
 
-    pub fn insert_mail<T>(&mut self, req: &CommRequest<T>, port: usize)
+    pub fn insert_mail<T>(&mut self, req: &CommRequest<T>, stream: &TcpStream)
         where T: Debug + Clone + Encodable
     {
         let mtype = if req.is_send() {
@@ -141,7 +160,9 @@ impl Mailbox {
             MessageTy::MRecv
         };
 
-        let mail = Mail::new(self.id, port, req);
+        let mail = Mail::new(self.id, req);
+        let cloned_stream = stream.try_clone().expect("Unable to clone TcpStream");
+        self.stream_map.insert(self.id, cloned_stream);
         self.id += 1;
 
         let h1_key = MailboxKey::new(mtype, req.src().unwrap(), req.tag());
@@ -287,7 +308,7 @@ mod test {
                                                CommRequestType::Message(MType::MRecv),
                                                1000u32);
 
-        mailbox.insert_mail(&req, 31337);
+        mailbox.insert_mail(&req, &get_tcp_stream());
         assert!(mailbox.pop_matching_mail(&req_recv).is_some());
     }
 
@@ -308,7 +329,7 @@ mod test {
                                                CommRequestType::Message(MType::MRecv),
                                                1000u32);
 
-        mailbox.insert_mail(&req, 31337);
+        mailbox.insert_mail(&req, &get_tcp_stream());
         assert!(mailbox.pop_matching_mail(&req_recv).is_some());
     }
 
@@ -329,7 +350,7 @@ mod test {
                                                CommRequestType::Message(MType::MRecv),
                                                1000u32);
 
-        mailbox.insert_mail(&req, 31337);
+        mailbox.insert_mail(&req, &get_tcp_stream());
         assert!(mailbox.pop_matching_mail(&req_recv).is_some());
     }
 
@@ -350,7 +371,7 @@ mod test {
                                                CommRequestType::Message(MType::MRecv),
                                                1000u32);
 
-        mailbox.insert_mail(&req, 31337);
+        mailbox.insert_mail(&req, &get_tcp_stream());
         assert!(mailbox.pop_matching_mail(&req_recv).is_some());
     }
 
@@ -371,7 +392,7 @@ mod test {
                                                CommRequestType::Message(MType::MRecv),
                                                1000u32);
 
-        mailbox.insert_mail(&req, 31337);
+        mailbox.insert_mail(&req, &get_tcp_stream());
         assert!(mailbox.pop_matching_mail(&req_recv).is_none());
     }
 
@@ -399,12 +420,12 @@ mod test {
                                                CommRequestType::Message(MType::MRecv),
                                                1000u32);
 
-        mailbox.insert_mail(&req, 31337);
-        mailbox.insert_mail(&req_1, 31337);
+        mailbox.insert_mail(&req, &get_tcp_stream());
+        mailbox.insert_mail(&req_1, &get_tcp_stream());
 
         let rep = mailbox.pop_matching_mail(&req_recv);
         assert!(rep.is_some());
-        assert_eq!(rep.unwrap().id, 0);
+        assert_eq!(rep.unwrap().0.id, 0);
     }
 
     #[test]
@@ -431,16 +452,16 @@ mod test {
                                                CommRequestType::Message(MType::MRecv),
                                                1000u32);
 
-        mailbox.insert_mail(&req, 31337);
-        mailbox.insert_mail(&req_1, 31337);
+        mailbox.insert_mail(&req, &get_tcp_stream());
+        mailbox.insert_mail(&req_1, &get_tcp_stream());
 
         let rep = mailbox.pop_matching_mail(&req_recv);
         assert!(rep.is_some());
-        assert_eq!(rep.unwrap().id, 0);
+        assert_eq!(rep.unwrap().0.id, 0);
 
         let rep = mailbox.pop_matching_mail(&req_recv);
         assert!(rep.is_some());
-        assert_eq!(rep.unwrap().id, 1);
+        assert_eq!(rep.unwrap().0.id, 1);
 
         assert!(mailbox.pop_matching_mail(&req_recv).is_none());
     }
@@ -463,10 +484,10 @@ mod test {
                                                1000u32);
 
 
-        mailbox.insert_mail(&req_recv, 31337);
+        mailbox.insert_mail(&req_recv, &get_tcp_stream());
         let rep = mailbox.pop_matching_mail(&req);
         assert!(rep.is_some());
-        assert_eq!(rep.unwrap().id, 0);
+        assert_eq!(rep.unwrap().0.id, 0);
         assert!(mailbox.pop_matching_mail(&req).is_none());
     }
 }
