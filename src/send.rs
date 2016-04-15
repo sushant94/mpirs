@@ -30,10 +30,10 @@ pub fn mpi_isend<T>(buf: &T,
     where T: 'static + Debug + Clone + Encodable + Decodable + Send
 {
     let pid = unsafe { libc::getpid() } as u32;
-    let mut commreq = CommRequest::new(None,
+    let mut commreq = CommRequest::<T>::new(None,
                                        Some(dest),
                                        tag,
-                                       Some(buf),
+                                       Some(buf.clone()),
                                        CommRequestType::Message(MType::MSend),
                                        pid);
     let commreq_json = json::encode(&commreq).unwrap();

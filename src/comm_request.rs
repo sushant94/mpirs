@@ -3,9 +3,10 @@
 //! `CommRequest` is the final structure that encloses the data to be sent within a struct that
 //! contains meta-data required for effective communication.
 
-use rustc_serialize::Encodable;
+use rustc_serialize::{Encodable, Decodable, json};
 use std::hash;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 /// Differentiate between communications and simlpe requests
 #[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable)]
@@ -31,6 +32,8 @@ pub enum ControlTy {
     NumProcs,
     /// Acknowledge a send when recv is successful
     Ack,
+    Exit,
+    Nop,
 }
 
 #[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable, PartialEq, Eq, Hash)]
@@ -42,20 +45,21 @@ pub enum RequestProc {
 }
 
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
-pub struct CommRequest<T: Debug + Clone + Encodable> {
+pub struct CommRequest<T: Debug + Clone + Encodable + Decodable> {
     /// Filled in by mpirun automatically. Not set by the sending process
     src: Option<RequestProc>,
     dest: Option<RequestProc>,
     /// Message Tag
     tag: u64,
+    pty: PhantomData<T>,
     /// Actual data to be sent
-    data: Option<T>,
+    data: Option<String>,
     /// Type of request
     req_ty: CommRequestType,
     pid: u32,
 }
 
-impl<T: Debug + Clone + Encodable> CommRequest<T> {
+impl<T: Debug + Clone + Encodable + Decodable> CommRequest<T> {
     pub fn new(src: Option<RequestProc>,
                dest: Option<RequestProc>,
                tag: u64,
@@ -63,11 +67,18 @@ impl<T: Debug + Clone + Encodable> CommRequest<T> {
                ty: CommRequestType,
                pid: u32)
                -> CommRequest<T> {
+        let json_data = if data.is_some() {
+            json::encode(data.as_ref().unwrap()).ok()
+        } else {
+            None
+        };
+
         CommRequest {
             src: src,
             dest: dest,
             tag: tag,
-            data: data,
+            data: json_data,
+            pty: PhantomData,
             req_ty: ty,
             pid: pid,
         }
@@ -85,7 +96,7 @@ impl<T: Debug + Clone + Encodable> CommRequest<T> {
         self.tag
     }
 
-    pub fn data(&self) -> Option<T> {
+    pub fn data(&self) -> Option<String> {
         self.data.clone()
     }
 
@@ -155,9 +166,10 @@ pub trait Extract {
     fn data(&self) -> Option<Self::DType>;
 }
 
-impl<T: Clone + Debug + Encodable> Extract for CommRequest<T> {
+impl<T: Clone + Debug + Encodable + Decodable> Extract for CommRequest<T> {
     type DType = T;
     fn data(&self) -> Option<Self::DType> {
-        self.data.clone()
+        let x: Option<T> = json::decode(self.data.as_ref().unwrap()).ok();
+        x
     }
 }

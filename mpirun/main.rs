@@ -14,7 +14,7 @@ extern crate mpirs;
 
 mod mailbox;
 
-use std::process::{Command, Stdio};
+use std::process::{Command};
 use std::io::Read;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
@@ -88,15 +88,16 @@ fn main() {
 
     let listener = TcpListener::bind("127.0.0.1:31337").unwrap();
     let mut mailbox = Mailbox::new();
+    let mut exit_count = 0;
 
     for stream in listener.incoming() {
         match stream {
             Ok(mut stream) => {
-                println!("GOT STREAM");
                 let json = read_from_stream(&mut stream);
                 let mut req: CommRequest<String> = json::decode(&json).expect("Invalid json");
                 if let CommRequestType::Control(ref ctrl) = req.req_type() {
                     match *ctrl {
+                        ControlTy::Nop => {},
                         ControlTy::GetMyRank => {
                             let to_send = format!("{}", rank_map[&req.pid()]);
                             stream.write(to_send.as_bytes());
@@ -105,6 +106,12 @@ fn main() {
                             let to_send = format!("{}", rank_map.keys().len());
                             stream.write(to_send.as_bytes());
                         }
+                        ControlTy::Exit => {
+                            exit_count += 1;
+                            if exit_count == num_procs {
+                                break;
+                            }
+                        },
                         _ => panic!("Invalid control request from process"),
                     }
                     continue;

@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use std::cmp::Ordering;
 use std::net::TcpStream;
 
-use rustc_serialize::Encodable;
+use rustc_serialize::{Encodable, Decodable};
 use rustc_serialize::json;
 
 use mpirs::comm_request::{CommRequest, RequestProc};
@@ -76,7 +76,7 @@ pub struct Mail {
 
 impl Mail {
     pub fn new<T>(id: usize, req: &CommRequest<T>) -> Mail
-        where T: Debug + Clone + Encodable
+        where T: Debug + Clone + Encodable + Decodable
     {
         Mail {
             id: id,
@@ -125,7 +125,7 @@ impl Mailbox {
     }
 
     pub fn pop_matching_mail<T>(&mut self, req: &CommRequest<T>) -> Option<(Mail, TcpStream)>
-        where T: Debug + Clone + Encodable
+        where T: Debug + Clone + Encodable + Decodable
     {
         let keys = Mailbox::mirror_keys(req);
         match keys.len() {
@@ -152,7 +152,7 @@ impl Mailbox {
     }
 
     pub fn insert_mail<T>(&mut self, req: &CommRequest<T>, stream: &TcpStream)
-        where T: Debug + Clone + Encodable
+        where T: Debug + Clone + Encodable + Decodable
     {
         let mtype = if req.is_send() {
             MessageTy::MSend
@@ -186,7 +186,7 @@ impl Mailbox {
     }
 
     fn mirror_keys<T>(req: &CommRequest<T>) -> Vec<KT>
-        where T: Debug + Clone + Encodable
+        where T: Debug + Clone + Encodable + Decodable
     {
         if req.is_send() {
             let mut keys = vec![KT::H1(MailboxKey::new(MessageTy::MRecv,
