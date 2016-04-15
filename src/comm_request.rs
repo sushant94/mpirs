@@ -45,17 +45,19 @@ pub struct CommRequest<T: Debug + Clone + Encodable> {
     /// Message Tag
     tag: u64,
     /// Actual data to be sent
-    data: T,
+    data: Option<T>,
     /// Type of request
     req_ty: CommRequestType,
+    pid: u32,
 }
 
 impl<T: Debug + Clone + Encodable> CommRequest<T> {
     pub fn new(src: Option<RequestProc>,
                dest: Option<RequestProc>,
                tag: u64,
-               data: T,
-               ty: CommRequestType)
+               data: Option<T>,
+               ty: CommRequestType,
+               pid: u32)
                -> CommRequest<T> {
         CommRequest {
             src: src,
@@ -63,6 +65,7 @@ impl<T: Debug + Clone + Encodable> CommRequest<T> {
             tag: tag,
             data: data,
             req_ty: ty,
+            pid: pid,
         }
     }
 
@@ -78,8 +81,12 @@ impl<T: Debug + Clone + Encodable> CommRequest<T> {
         self.tag
     }
 
-    pub fn data(&self) -> T {
+    pub fn data(&self) -> Option<T> {
         self.data.clone()
+    }
+
+    pub fn req_type(&self) -> CommRequestType {
+        self.req_ty
     }
 
     pub fn set_source(&mut self, src: RequestProc) {
@@ -139,6 +146,6 @@ pub trait Extract {
 impl<T: Clone + Debug + Encodable> Extract for CommRequest<T> {
     type DType = T;
     fn data(&self) -> Self::DType {
-        self.data.clone()
+        self.data.as_ref().unwrap().clone()
     }
 }

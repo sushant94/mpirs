@@ -2,7 +2,6 @@
 //!
 
 use std::collections::{HashMap, VecDeque};
-use std::collections::hash_map::Entry;
 use std::fmt::Debug;
 use std::cmp::Ordering;
 
@@ -16,6 +15,15 @@ macro_rules! get_value {
         match $k {
             KT::H1(ref k) => $m.h1.get(k).cloned(),
             KT::H2(ref k) => $m.h2.get(k).cloned(),
+        }
+    }
+}
+
+macro_rules! get_mut_value {
+    ($m: ident, $k: expr) => {
+        match $k {
+            KT::H1(ref k) => $m.h1.get_mut(k),
+            KT::H2(ref k) => $m.h2.get_mut(k),
         }
     }
 }
@@ -187,9 +195,9 @@ impl Mailbox {
     }
 
     fn fast_first_union_intersect(&mut self, keys: Vec<KT>) -> Option<Mail> {
-        let mut v1 = get_value!(self, keys[0]).unwrap_or(VecDeque::new());
-        let mut v2 = get_value!(self, keys[1]).unwrap_or(VecDeque::new());
-        let mut v3 = get_value!(self, keys[2]).unwrap_or(VecDeque::new());
+        let v1 = get_value!(self, keys[0]).unwrap_or(VecDeque::new());
+        let v2 = get_value!(self, keys[1]).unwrap_or(VecDeque::new());
+        let v3 = get_value!(self, keys[2]).unwrap_or(VecDeque::new());
 
         let mut i: usize = 0;
         let mut j: usize = 0;
@@ -209,8 +217,8 @@ impl Mailbox {
                 if v1[i] < v3[k] {
                     i += 1;
                 } else if v1[i] == v3[k] {
-                    found = v1.remove(i);
-                    v3.remove(k);
+                    found = get_mut_value!(self, keys[0]).unwrap().remove(i);
+                    get_mut_value!(self, keys[2]).unwrap().remove(k);
                     break;
                 }
             }
@@ -219,8 +227,8 @@ impl Mailbox {
                 if v2[j] < v3[k] {
                     j += 1;
                 } else if v2[j] == v3[k] {
-                    found = v2.remove(j);
-                    v3.remove(k);
+                    found = get_mut_value!(self, keys[1]).unwrap().remove(j);
+                    get_mut_value!(self, keys[2]).unwrap().remove(k);
                     break;
                 }
             }
@@ -231,57 +239,27 @@ impl Mailbox {
                 }
             }
         }
-
-        insert_value!(self, keys[0], v1);
-        insert_value!(self, keys[1], v2);
-        insert_value!(self, keys[2], v3);
         found
     }
 
     fn fast_first_union(&mut self, keys: Vec<KT>) -> Option<Mail> {
-        let (e, v1_, v2_) = {
-            let v1 = get_value!(self, keys[0]);
-            let v2 = get_value!(self, keys[1]);
+        let v1 = get_value!(self, keys[0]).unwrap_or(VecDeque::new());
+        let v2 = get_value!(self, keys[1]).unwrap_or(VecDeque::new());
 
-            match (v1, v2) {
-                (None, None) => (None, None, None),
-                (None, Some(e)) => {
-                    let mut e_ = e.clone();
-                    let ele = e_.pop_front();
-                    (ele, None, Some(e_))
-                }
-                (Some(e), None) => {
-                    let mut e_ = e.clone();
-                    let ele = e_.pop_front();
-                    (ele, Some(e_), None)
-                }
-                (Some(e), Some(e_)) => {
-                    let mut vec1 = e.clone();
-                    let mut vec2 = e_.clone();
-                    let ele = if vec1.is_empty() && vec2.is_empty() {
-                        None
-                    } else if vec1.is_empty() {
-                        vec2.pop_front()
-                    } else if vec2.is_empty() {
-                        vec1.pop_front()
-                    } else {
-                        match vec1[0].cmp(&vec2[0]) {
-                            Ordering::Less => vec1.pop_front(),
-                            Ordering::Greater => vec2.pop_front(),
-                            Ordering::Equal => unreachable!(),
-                        }
-                    };
-                    (ele, Some(vec1), Some(vec2))
-                }
+        let ele = if v1.is_empty() && v2.is_empty() {
+            None
+        } else if v1.is_empty() {
+            get_mut_value!(self, keys[1]).unwrap().pop_front()
+        } else if v2.is_empty() {
+            get_mut_value!(self, keys[0]).unwrap().pop_front()
+        } else {
+            match v1[0].cmp(&v2[0]) {
+                Ordering::Less => get_mut_value!(self, keys[0]).unwrap().pop_front(),
+                Ordering::Greater => get_mut_value!(self, keys[1]).unwrap().pop_front(),
+                Ordering::Equal => unreachable!(),
             }
         };
-        if v1_.is_some() {
-            insert_value!(self, keys[0], v1_.unwrap());
-        }
-        if v2_.is_some() {
-            insert_value!(self, keys[1], v2_.unwrap());
-        }
-        e
+        ele
     }
 }
 
@@ -298,14 +276,16 @@ mod test {
         let req = CommRequest::new(Some(RequestProc::Process(0)),
                                    Some(RequestProc::Process(1)),
                                    COMM_TAG,
-                                   5u64,
-                                   CommRequestType::Message(MType::MSend));
+                                   Some(5u64),
+                                   CommRequestType::Message(MType::MSend),
+                                   1000u32);
 
-        let req_recv = CommRequest::new(Some(RequestProc::Process(0)),
-                                        Some(RequestProc::Process(1)),
-                                        COMM_TAG,
-                                        5u64,
-                                        CommRequestType::Message(MType::MRecv));
+        let req_recv = CommRequest::<u64>::new(Some(RequestProc::Process(0)),
+                                               Some(RequestProc::Process(1)),
+                                               COMM_TAG,
+                                               None,
+                                               CommRequestType::Message(MType::MRecv),
+                                               1000u32);
 
         mailbox.insert_mail(&req, 31337);
         assert!(mailbox.pop_matching_mail(&req_recv).is_some());
@@ -314,17 +294,19 @@ mod test {
     #[test]
     fn box_insert_get_proc_to_any() {
         let mut mailbox = Mailbox::new();
-        let req = CommRequest::new(Some(RequestProc::Process(0)),
-                                   Some(RequestProc::Process(1)),
-                                   COMM_TAG,
-                                   5u64,
-                                   CommRequestType::Message(MType::MSend));
+        let req = CommRequest::<u64>::new(Some(RequestProc::Process(0)),
+                                          Some(RequestProc::Process(1)),
+                                          COMM_TAG,
+                                          Some(5u64),
+                                          CommRequestType::Message(MType::MSend),
+                                          1000u32);
 
-        let req_recv = CommRequest::new(Some(RequestProc::Any),
-                                        Some(RequestProc::Process(1)),
-                                        COMM_TAG,
-                                        5u64,
-                                        CommRequestType::Message(MType::MRecv));
+        let req_recv = CommRequest::<u64>::new(Some(RequestProc::Any),
+                                               Some(RequestProc::Process(1)),
+                                               COMM_TAG,
+                                               None,
+                                               CommRequestType::Message(MType::MRecv),
+                                               1000u32);
 
         mailbox.insert_mail(&req, 31337);
         assert!(mailbox.pop_matching_mail(&req_recv).is_some());
@@ -333,17 +315,19 @@ mod test {
     #[test]
     fn box_insert_get_any_to_proc() {
         let mut mailbox = Mailbox::new();
-        let req = CommRequest::new(Some(RequestProc::Process(0)),
-                                   Some(RequestProc::Any),
-                                   COMM_TAG,
-                                   5u64,
-                                   CommRequestType::Message(MType::MSend));
+        let req = CommRequest::<u64>::new(Some(RequestProc::Process(0)),
+                                          Some(RequestProc::Any),
+                                          COMM_TAG,
+                                          Some(5u64),
+                                          CommRequestType::Message(MType::MSend),
+                                          1000u32);
 
-        let req_recv = CommRequest::new(Some(RequestProc::Process(0)),
-                                        Some(RequestProc::Process(1)),
-                                        COMM_TAG,
-                                        5u64,
-                                        CommRequestType::Message(MType::MRecv));
+        let req_recv = CommRequest::<u64>::new(Some(RequestProc::Process(0)),
+                                               Some(RequestProc::Process(1)),
+                                               COMM_TAG,
+                                               None,
+                                               CommRequestType::Message(MType::MRecv),
+                                               1000u32);
 
         mailbox.insert_mail(&req, 31337);
         assert!(mailbox.pop_matching_mail(&req_recv).is_some());
@@ -352,17 +336,19 @@ mod test {
     #[test]
     fn box_insert_get_any_to_any() {
         let mut mailbox = Mailbox::new();
-        let req = CommRequest::new(Some(RequestProc::Process(0)),
-                                   Some(RequestProc::Any),
-                                   COMM_TAG,
-                                   5u64,
-                                   CommRequestType::Message(MType::MSend));
+        let req = CommRequest::<u64>::new(Some(RequestProc::Process(0)),
+                                          Some(RequestProc::Any),
+                                          COMM_TAG,
+                                          Some(5u64),
+                                          CommRequestType::Message(MType::MSend),
+                                          1000u32);
 
-        let req_recv = CommRequest::new(Some(RequestProc::Any),
-                                        Some(RequestProc::Process(1)),
-                                        COMM_TAG,
-                                        5u64,
-                                        CommRequestType::Message(MType::MRecv));
+        let req_recv = CommRequest::<u64>::new(Some(RequestProc::Any),
+                                               Some(RequestProc::Process(1)),
+                                               COMM_TAG,
+                                               None,
+                                               CommRequestType::Message(MType::MRecv),
+                                               1000u32);
 
         mailbox.insert_mail(&req, 31337);
         assert!(mailbox.pop_matching_mail(&req_recv).is_some());
@@ -371,17 +357,19 @@ mod test {
     #[test]
     fn box_proc_2_recv_any() {
         let mut mailbox = Mailbox::new();
-        let req = CommRequest::new(Some(RequestProc::Process(0)),
-                                   Some(RequestProc::Process(2)),
-                                   COMM_TAG,
-                                   5u64,
-                                   CommRequestType::Message(MType::MSend));
+        let req = CommRequest::<u64>::new(Some(RequestProc::Process(0)),
+                                          Some(RequestProc::Process(2)),
+                                          COMM_TAG,
+                                          Some(5u64),
+                                          CommRequestType::Message(MType::MSend),
+                                          1000u32);
 
-        let req_recv = CommRequest::new(Some(RequestProc::Any),
-                                        Some(RequestProc::Process(1)),
-                                        COMM_TAG,
-                                        5u64,
-                                        CommRequestType::Message(MType::MRecv));
+        let req_recv = CommRequest::<u64>::new(Some(RequestProc::Any),
+                                               Some(RequestProc::Process(1)),
+                                               COMM_TAG,
+                                               None,
+                                               CommRequestType::Message(MType::MRecv),
+                                               1000u32);
 
         mailbox.insert_mail(&req, 31337);
         assert!(mailbox.pop_matching_mail(&req_recv).is_none());
@@ -390,23 +378,26 @@ mod test {
     #[test]
     fn box_inorder() {
         let mut mailbox = Mailbox::new();
-        let req = CommRequest::new(Some(RequestProc::Process(0)),
-                                   Some(RequestProc::Process(1)),
-                                   COMM_TAG,
-                                   5u64,
-                                   CommRequestType::Message(MType::MSend));
+        let req = CommRequest::<u64>::new(Some(RequestProc::Process(0)),
+                                          Some(RequestProc::Process(1)),
+                                          COMM_TAG,
+                                          Some(5u64),
+                                          CommRequestType::Message(MType::MSend),
+                                          1000u32);
 
-        let req_1 = CommRequest::new(Some(RequestProc::Process(0)),
-                                   Some(RequestProc::Any),
-                                   COMM_TAG,
-                                   5u64,
-                                   CommRequestType::Message(MType::MSend));
+        let req_1 = CommRequest::<u64>::new(Some(RequestProc::Process(0)),
+                                            Some(RequestProc::Any),
+                                            COMM_TAG,
+                                            Some(5u64),
+                                            CommRequestType::Message(MType::MSend),
+                                            1000u32);
 
-        let req_recv = CommRequest::new(Some(RequestProc::Any),
-                                        Some(RequestProc::Process(1)),
-                                        COMM_TAG,
-                                        5u64,
-                                        CommRequestType::Message(MType::MRecv));
+        let req_recv = CommRequest::<u64>::new(Some(RequestProc::Any),
+                                               Some(RequestProc::Process(1)),
+                                               COMM_TAG,
+                                               None,
+                                               CommRequestType::Message(MType::MRecv),
+                                               1000u32);
 
         mailbox.insert_mail(&req, 31337);
         mailbox.insert_mail(&req_1, 31337);
@@ -415,27 +406,30 @@ mod test {
         assert!(rep.is_some());
         assert_eq!(rep.unwrap().id, 0);
     }
-    
+
     #[test]
     fn box_inorder_multiple() {
         let mut mailbox = Mailbox::new();
-        let req = CommRequest::new(Some(RequestProc::Process(0)),
-                                   Some(RequestProc::Process(1)),
-                                   COMM_TAG,
-                                   5u64,
-                                   CommRequestType::Message(MType::MSend));
+        let req = CommRequest::<u64>::new(Some(RequestProc::Process(0)),
+                                          Some(RequestProc::Process(1)),
+                                          COMM_TAG,
+                                          Some(5u64),
+                                          CommRequestType::Message(MType::MSend),
+                                          1000u32);
 
-        let req_1 = CommRequest::new(Some(RequestProc::Process(0)),
-                                   Some(RequestProc::Any),
-                                   COMM_TAG,
-                                   5u64,
-                                   CommRequestType::Message(MType::MSend));
+        let req_1 = CommRequest::<u64>::new(Some(RequestProc::Process(0)),
+                                            Some(RequestProc::Any),
+                                            COMM_TAG,
+                                            Some(5u64),
+                                            CommRequestType::Message(MType::MSend),
+                                            1000u32);
 
-        let req_recv = CommRequest::new(Some(RequestProc::Any),
-                                        Some(RequestProc::Process(1)),
-                                        COMM_TAG,
-                                        5u64,
-                                        CommRequestType::Message(MType::MRecv));
+        let req_recv = CommRequest::<u64>::new(Some(RequestProc::Any),
+                                               Some(RequestProc::Process(1)),
+                                               COMM_TAG,
+                                               None,
+                                               CommRequestType::Message(MType::MRecv),
+                                               1000u32);
 
         mailbox.insert_mail(&req, 31337);
         mailbox.insert_mail(&req_1, 31337);
@@ -454,17 +448,19 @@ mod test {
     #[test]
     fn box_recv_before_send() {
         let mut mailbox = Mailbox::new();
-        let req = CommRequest::new(Some(RequestProc::Process(0)),
-                                   Some(RequestProc::Process(1)),
-                                   COMM_TAG,
-                                   5u64,
-                                   CommRequestType::Message(MType::MSend));
+        let req = CommRequest::<u64>::new(Some(RequestProc::Process(0)),
+                                          Some(RequestProc::Process(1)),
+                                          COMM_TAG,
+                                          Some(5u64),
+                                          CommRequestType::Message(MType::MSend),
+                                          1000u32);
 
-        let req_recv = CommRequest::new(Some(RequestProc::Any),
-                                        Some(RequestProc::Process(1)),
-                                        COMM_TAG,
-                                        5u64,
-                                        CommRequestType::Message(MType::MRecv));
+        let req_recv = CommRequest::<u64>::new(Some(RequestProc::Any),
+                                               Some(RequestProc::Process(1)),
+                                               COMM_TAG,
+                                               None,
+                                               CommRequestType::Message(MType::MRecv),
+                                               1000u32);
 
 
         mailbox.insert_mail(&req_recv, 31337);

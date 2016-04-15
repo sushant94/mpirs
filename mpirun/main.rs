@@ -24,12 +24,14 @@ use std::os::unix::io::IntoRawFd;
 use std::os::unix::io::FromRawFd;
 use std::fs::File;
 use std::io::Write;
+use std::net::{TcpListener, TcpStream};
+use std::collections::HashMap;
 
 use rustc_serialize::json;
 
 use docopt::Docopt;
 
-use mpirs::comm_request::CommRequest;
+use mpirs::comm_request::{CommRequest, CommRequestType, ControlTy};
 
 static USAGE: &'static str = "
 mpirs. Run MPI Programs in rust.
@@ -59,19 +61,7 @@ struct Args {
 
     //send_fd.send(child.stdin.unwrap().into_raw_fd()).expect("Failed to forward fd");
 
-    //loop {
-        //let mut bytes_read = [0; 2048];
-        //let mut str_in = String::new();
-        //if let Some(stdout) = child.stdout.as_mut() {
-            //loop {
-                //let n = stdout.read(&mut bytes_read).expect("Read Error:");
-                //str_in = format!("{}{}", str_in,
-                                //String::from_utf8(bytes_read[0..n].to_vec()).unwrap());
-                //if n < 2048 {
-                    //break;
-                //}
-            //}
-        //}
+
         //// Work with the string in str_in.
         //if !str_in.is_empty() {
             //let mut req: CommRequest = json::decode(&str_in).expect("Invalid Json!");
@@ -81,11 +71,60 @@ struct Args {
     //}
 //}
 
+fn read_from_stream(stream: &mut TcpStream) -> String {
+    let mut bytes_read = [0; 2048];
+    let mut str_in = String::new();
+    loop {
+        let n = stream.read(&mut bytes_read).expect("Read Error:");
+        str_in = format!("{}{}", str_in,
+                         String::from_utf8(bytes_read[0..n].to_vec()).unwrap());
+        if n < 2048 {
+            break;
+        }
+    }
+    str_in
+}
+
 fn main() {
     let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
     let num_procs = args.flag_num.unwrap_or(4);
 
     let bin = args.arg_executable.clone();
+
+    let mut rank_map = HashMap::new();
+
+    for i in 0..num_procs {
+        let mut child = Command::new(&bin)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("Failed to spawn process!");
+
+        rank_map.insert(child.id(), i);
+    }
+
+    let listener = TcpListener::bind("127.0.0.1:31337").unwrap();
+
+    for stream in listener.incoming() {
+        match stream {
+            Ok(mut stream) => {
+                let json = read_from_stream(&mut stream);
+                let mut req: CommRequest<String> = json::decode(&json).expect("Invalid json");
+                if let CommRequestType::Control(ref ctrl) = req.req_type() {
+                    match *ctrl {
+                        ControlTy::GetMyRank => unimplemented!(),
+                    }
+                    continue;
+                }
+
+
+
+
+            }
+            Err(e) => {
+            }
+        }
+    }
 
     // Create n channels to listen on for the master thread
     //let (tx, rx) = mpsc::channel();
