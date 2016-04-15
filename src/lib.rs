@@ -1,6 +1,7 @@
 //! mpirs - An MPI Implementation in rust
 
 extern crate rustc_serialize;
+extern crate libc;
 
 pub mod mpi_datatype;
 pub mod mpi_comm;
