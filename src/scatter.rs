@@ -9,14 +9,16 @@ use rustc_serialize::Encodable;
 use send::mpi_send;
 use receive::mpi_recv;
 use comm_rank::mpi_comm_rank;
+use num_procs::mpi_get_num_procs;
+use std::u64;
 
 // Functions in the Scatter module
 pub fn mpi_scatterv<T>(sendbuf: Vec<T>, sendcount: Vec<usize>,
 			 displs: Vec<usize>, datatype: MPIDatatype, recvbuf: &mut T, recvcount: u64, root: usize, comm: MPIComm) 
 			 where T: 'static + Debug + Clone + Encodable + Decodable + Send {
 
-		let n = 4;
-		let tag = 42;
+		let n = mpi_get_num_procs();
+		let tag = u64::MAX;
 		if mpi_comm_rank() == root {
 
 			// verify if sum of sendcount equals size of sendbuf

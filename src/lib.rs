@@ -9,7 +9,8 @@ pub mod mpi_request;
 pub mod comm_request;
 pub mod receiver_traits;
 
-
+pub mod init;
+pub mod finalize;
 pub mod send;
 pub mod wait;
 pub mod receive;

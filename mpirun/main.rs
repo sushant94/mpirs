@@ -52,7 +52,7 @@ fn make_ack() -> CommRequest<String> {
                      u64::max_value(),
                      Some("ack".to_owned()),
                      CommRequestType::Control(ControlTy::Ack),
-                     0);
+                     0)
 }
 
 fn read_from_stream(stream: &mut TcpStream) -> String {
