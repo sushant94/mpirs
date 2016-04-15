@@ -29,7 +29,6 @@ pub fn mpi_isend<T>(buf: &T,
                     -> Receiver<CommRequest<T>>
     where T: 'static + Debug + Clone + Encodable + Decodable + Send
 {
-
     let pid = unsafe { libc::getpid() } as u32;
     let mut commreq = CommRequest::new(None,
                                        Some(dest),

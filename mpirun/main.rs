@@ -46,6 +46,15 @@ struct Args {
     flag_num: Option<usize>,
 }
 
+fn make_ack() -> CommRequest<String> {
+    CommRequest::new(None,
+                     None,
+                     u64::max_value(),
+                     Some("ack".to_owned()),
+                     CommRequestType::Control(ControlTy::Ack),
+                     0);
+}
+
 fn read_from_stream(stream: &mut TcpStream) -> String {
     let mut bytes_read = [0; 2048];
     let mut str_in = String::new();
@@ -71,8 +80,8 @@ fn main() {
 
     for i in 0..num_procs {
         let child = Command::new(&bin)
-                            .spawn()
-                            .expect("Failed to spawn process!");
+                        .spawn()
+                        .expect("Failed to spawn process!");
 
         rank_map.insert(child.id(), i);
     }
@@ -115,26 +124,14 @@ fn main() {
                             stream_r.write(&json::encode(&req)
                                                 .expect("json encode failed!")
                                                 .as_bytes());
-                            let ack =
-                                CommRequest::<u32>::new(None,
-                                                        None,
-                                                        u64::max_value(),
-                                                        None,
-                                                        CommRequestType::Control(ControlTy::Ack),
-                                                        0);
+                            let ack = make_ack();
                             stream.write(&json::encode(&ack)
                                               .expect("json encode failed!")
                                               .as_bytes());
                         }
                         false => {
                             stream.write(mail.req.as_bytes());
-                            let ack =
-                                CommRequest::<u32>::new(None,
-                                                        None,
-                                                        u64::max_value(),
-                                                        None,
-                                                        CommRequestType::Control(ControlTy::Ack),
-                                                        0);
+                            let ack = make_ack();
                             stream_r.write(&json::encode(&ack)
                                                 .expect("json encode failed!")
                                                 .as_bytes());

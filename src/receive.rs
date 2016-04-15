@@ -76,5 +76,5 @@ pub fn mpi_recv<T>(buf: &mut T,
 {
 
     let mut rx: Receiver<CommRequest<T>> = mpi_irecv(buf, count, datatype, src, tag, comm);
-    *buf = rx.wait();
+    *buf = rx.wait().expect("No data!");
 }

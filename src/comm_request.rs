@@ -152,12 +152,12 @@ impl<T: Debug + Clone + Encodable> CommRequest<T> {
 
 pub trait Extract {
     type DType: Clone + Debug;
-    fn data(&self) -> Self::DType;
+    fn data(&self) -> Option<Self::DType>;
 }
 
 impl<T: Clone + Debug + Encodable> Extract for CommRequest<T> {
     type DType = T;
-    fn data(&self) -> Self::DType {
-        self.data.as_ref().expect("No data found!").clone()
+    fn data(&self) -> Option<Self::DType> {
+        self.data.clone()
     }
 }

@@ -11,24 +11,23 @@ pub trait Message {
 
     // Function to read data directly from Receiver
     fn data(&self) -> Option<<Self::T as Extract>::DType>;
-    fn wait(&self) -> <Self::T as Extract>::DType;
+    fn wait(&self) -> Option<<Self::T as Extract>::DType>;
 }
 
 
 impl<T: Extract + Clone + Debug> Message for Receiver<T> {
 	type T = T;
 
-	fn data(&self) -> Option<<Self::T as Extract>::DType> {
-	  if let Some(ref data) = self.try_recv().ok() {
-          Some(data.data())
-      } else {
-          None
-      }
-	}
+    fn data(&self) -> Option<<Self::T as Extract>::DType> {
+        if let Some(ref data) = self.try_recv().ok() {
+            data.data()
+        } else {
+            None
+        }
+    }
 
-	fn wait(&self) -> <Self::T as Extract>::DType {
-	  let res = self.recv().expect("RecvError");
-	  res.data()
-	}
-
+    fn wait(&self) -> Option<<Self::T as Extract>::DType> {
+        let res = self.recv().expect("RecvError");
+        res.data()
+    }
 }
