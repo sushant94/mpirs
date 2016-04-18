@@ -10,3 +10,14 @@ Rust benchmarks are automatically built in release (most optimized) mode. Run
 Individual benchmarks can then be run (from `rust/` directory) using:
 
 `mpirun-rs -n <num_procs> ./target/debug/<bin_name>`
+
+## Performance - Are we fast yet?
+
+* Results for _token_
+![token](./token.png)
+
+* Results for _sendrecv_
+![sendrecv](./sendrecv.png)
+
+* Results for _daxpy_
+![daxpy](./daxpy.png)
