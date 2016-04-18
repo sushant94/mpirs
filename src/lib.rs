@@ -19,6 +19,7 @@ pub mod comm_rank;
 pub mod num_procs;
 pub mod scatter;
 pub mod barrier;
+pub mod gather;
 
 pub mod utils {
     use libc;
