@@ -90,6 +90,8 @@ fn main() {
     let mut mailbox = Mailbox::new();
     let mut exit_count = 0;
 
+    let mut barrier_wait = Vec::new();
+
     for stream in listener.incoming() {
         match stream {
             Ok(mut stream) => {
@@ -98,6 +100,15 @@ fn main() {
                 if let CommRequestType::Control(ref ctrl) = req.req_type() {
                     match *ctrl {
                         ControlTy::Nop => {},
+                        ControlTy::Barrier => {
+                            barrier_wait.push(stream.try_clone().unwrap());
+                            if barrier_wait.len() == num_procs {
+                                while let Some(ref mut st) = barrier_wait.pop() {
+                                    let ack = json::encode(&make_ack()).unwrap();
+                                    st.write(ack.as_bytes());
+                                }
+                            }
+                        },
                         ControlTy::GetMyRank => {
                             let to_send = format!("{}", rank_map[&req.pid()]);
                             stream.write(to_send.as_bytes());

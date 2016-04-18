@@ -1,8 +1,11 @@
 extern crate mpirs;
 extern crate rustc_serialize;
 extern crate libc;
+extern crate stopwatch;
 
 use std::fmt;
+
+use stopwatch::Stopwatch;
 
 use mpirs::{comm_rank, init, finalize, bcast};
 use mpirs::mpi_comm::MPI_COMM_WORLD;

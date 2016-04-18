@@ -33,6 +33,7 @@ pub enum ControlTy {
     Ack,
     Exit,
     Nop,
+    Barrier,
 }
 
 #[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable, PartialEq, Eq, Hash)]

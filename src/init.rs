@@ -5,11 +5,11 @@ use comm_request::CommRequestType;
 use comm_request::ControlTy;
 use std::io::prelude::*;
 use std::net::TcpStream;
-use std::u64;
+use utils;
 
 pub fn mpi_init() {
-    let pid = unsafe { libc::getpid() } as u32;
-    let tag:u64 = u64::MAX;
+    let pid = utils::pid();
+    let tag: u64 = u64::max_value();
     loop {
         if let Ok(ref mut stream) = TcpStream::connect("127.0.0.1:31337") {
             let commreq = CommRequest::<u32>::new(None,

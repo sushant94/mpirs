@@ -3,7 +3,7 @@
 This is an implementation of the MPI standard in Rust. Unlike other projects
 that provide bindings to C (or other) implementations, mpirs is entirely
 self-contained and completely written in Rust. This comes with advantages of
-being able to use convenience and expressiveness of Rust but at the same time
+being able to use convenience and expressiveness of Rust. At the same time
 the library is not complete and as heavily tested as compared to more mature
 implementations.
 
@@ -20,7 +20,9 @@ the `bin/` directory). To run the program, use:
 `./target/debug/mpirun -n <num_procs> <path/to/rust/executable>`
 
 Alternatively, to make it easier to use, you could also set up a symlink to
-the mpirun. (`ln -s $(PWD)/target/debug/mpirun /usr/bin/`)
+the mpirun.
+
+`ln -s $(PWD)/target/debug/mpirun /usr/bin/`
 
 ### Example:
 

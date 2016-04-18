@@ -5,11 +5,11 @@ use comm_request::CommRequestType;
 use comm_request::ControlTy;
 use std::io::prelude::*;
 use std::net::TcpStream;
-use std::u64;
+use utils;
 
 pub fn mpi_get_num_procs() -> usize {
-	  let pid = unsafe { libc::getpid() } as u32;
-	  let tag:u64 = u64::MAX;
+	  let pid = utils::pid();
+	  let tag:u64 = u64::max_value();
 	  let mut np:Option<usize> = None;
 		let commreq = CommRequest::<u32>::new(None, None, tag, None, CommRequestType::Control(ControlTy::NumProcs), pid);
 		let commreq_json = json::encode(&commreq).unwrap();

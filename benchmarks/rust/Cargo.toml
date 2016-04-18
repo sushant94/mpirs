@@ -1,19 +1,31 @@
 [package]
-name = "mpirs"
+name = "mpirs-bench"
 version = "0.1.0"
 authors = ["Sushant <sushant.dinesh94@gmail.com>",
            "Karthik Senthil <karthik.senthil@gmail.com>"]
 
 [[bin]]
-name = "mpirun"
-path = "mpirun/main.rs"
+name = "bench_token"
+path = "src/token.rs"
+
+[[bin]]
+name = "bench_data"
+path = "src/bench_data.rs"
+
+[[bin]]
+name = "bench_daxpy"
+path = "src/daxpy.rs"
 
 [dependencies]
-docopt = "0.6"
 rustc-serialize = "*"
 libc = "*"
+stopwatch = "*"
+rand = "*"
 
-[profile.release]
+[dependencies.mpirs]
+path = "../../"
+
+[profile.dev]
 opt-level = 3
 debug = false
 rpath = false

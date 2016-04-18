@@ -14,6 +14,7 @@ use rustc_serialize::Encodable;
 use rustc_serialize::Decodable;
 use std::io::prelude::*;
 use std::net::TcpStream;
+use utils;
 
 
 // Functions in the Send module
@@ -24,7 +25,7 @@ pub fn mpi_isend<T>(buf: &T,
                     -> Receiver<CommRequest<T>>
     where T: 'static + Debug + Clone + Encodable + Decodable + Send
 {
-    let pid = unsafe { libc::getpid() } as u32;
+    let pid = utils::pid();
     let commreq = CommRequest::<T>::new(None,
                                        Some(dest),
                                        tag,
