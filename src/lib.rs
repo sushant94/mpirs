@@ -18,3 +18,4 @@ pub mod bcast;
 pub mod comm_rank;
 pub mod num_procs;
 pub mod scatter;
+pub mod gather;
