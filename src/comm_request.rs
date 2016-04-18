@@ -4,7 +4,6 @@
 //! contains meta-data required for effective communication.
 
 use rustc_serialize::{Encodable, Decodable, json};
-use std::hash;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 

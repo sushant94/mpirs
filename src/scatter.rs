@@ -1,8 +1,6 @@
 use rustc_serialize::json;
 use rustc_serialize::Decodable;
-use mpi_datatype::MPIDatatype;
 use mpi_comm::MPIComm;
-use comm_request::CommRequest;
 use comm_request::RequestProc;
 use std::fmt::Debug;
 use rustc_serialize::Encodable;
@@ -14,7 +12,7 @@ use std::u64;
 
 // Functions in the Scatter module
 pub fn mpi_scatterv<T>(sendbuf: Vec<T>, sendcount: Vec<usize>,
-			 displs: Vec<usize>, datatype: MPIDatatype, recvbuf: &mut T, recvcount: u64, root: usize, comm: MPIComm) 
+			 displs: Vec<usize>, recvbuf: &mut T, root: usize, comm: MPIComm) 
 			 where T: 'static + Debug + Clone + Encodable + Decodable + Send {
 
 		let n = mpi_get_num_procs();
@@ -29,12 +27,12 @@ pub fn mpi_scatterv<T>(sendbuf: Vec<T>, sendcount: Vec<usize>,
 			}
 
 			for i in 0..n {
-					let mut buf = sendbuf[displs[i]..sendcount[i]].to_vec();
-			    mpi_send(&json::encode(&buf).unwrap(), buf.len() as u64, datatype, RequestProc::Process(i), tag, comm);
+					let buf = sendbuf[displs[i]..sendcount[i]].to_vec();
+			    mpi_send(&json::encode(&buf).unwrap(), RequestProc::Process(i), tag, comm);
 			}
 		}
 		
-		mpi_recv(recvbuf, recvcount, datatype, RequestProc::Process(root), tag, comm);
+		mpi_recv(recvbuf, RequestProc::Process(root), tag, comm);
 		
 }
 

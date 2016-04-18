@@ -1,6 +1,4 @@
 use std::sync::mpsc::Receiver;
-use std::sync::mpsc::TryRecvError;
-use std::sync::mpsc::RecvError;
 
 use comm_request::Extract;
 

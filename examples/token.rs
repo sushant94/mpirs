@@ -4,7 +4,7 @@ extern crate libc;
 
 use std::fmt;
 
-use mpirs::{comm_rank, num_procs, send, receive, mpi_datatype, init, finalize};
+use mpirs::{comm_rank, num_procs, send, receive, init, finalize};
 use mpirs::comm_request::RequestProc;
 use mpirs::mpi_comm::MPI_COMM_WORLD;
 
@@ -31,15 +31,11 @@ fn main() {
     if rank == 0 {
         let mut token = Token { val: 65 };
         send::mpi_send(&token,
-                       1,
-                       mpi_datatype::MPIDatatype::Int,
                        RequestProc::Process((rank + 1) % size),
                        TAG,
                        MPI_COMM_WORLD);
 
         receive::mpi_recv(&mut token,
-                          1,
-                          mpi_datatype::MPIDatatype::Int,
                           RequestProc::Process(size - 1),
                           TAG,
                           MPI_COMM_WORLD);
@@ -50,8 +46,6 @@ fn main() {
     } else {
         let mut token = Token { val: 0 };
         receive::mpi_recv(&mut token,
-                          1,
-                          mpi_datatype::MPIDatatype::Int,
                           RequestProc::Process(rank - 1),
                           TAG,
                           MPI_COMM_WORLD);
@@ -62,8 +56,6 @@ fn main() {
 
         token.val += 1;
         send::mpi_send(&token,
-                       1,
-                       mpi_datatype::MPIDatatype::Int,
                        RequestProc::Process((rank + 1) % size),
                        TAG,
                        MPI_COMM_WORLD);

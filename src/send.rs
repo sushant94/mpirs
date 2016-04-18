@@ -1,12 +1,11 @@
-use rustc_serialize::json::{self, ToJson};
+use rustc_serialize::json;
 use libc;
-use mpi_datatype::MPIDatatype;
 use mpi_comm::MPIComm;
 use comm_request::CommRequest;
 use comm_request::CommRequestType;
 use comm_request::RequestProc;
 use comm_request::MType;
-use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc::{Receiver};
 use std::sync::mpsc::channel;
 use std::thread;
 use receiver_traits::Message;
@@ -17,12 +16,8 @@ use std::io::prelude::*;
 use std::net::TcpStream;
 
 
-const MPI_RS: usize = 0;
-
 // Functions in the Send module
 pub fn mpi_isend<T>(buf: &T,
-                    count: u64,
-                    datatype: MPIDatatype,
                     dest: RequestProc,
                     tag: u64,
                     comm: MPIComm)
@@ -30,7 +25,7 @@ pub fn mpi_isend<T>(buf: &T,
     where T: 'static + Debug + Clone + Encodable + Decodable + Send
 {
     let pid = unsafe { libc::getpid() } as u32;
-    let mut commreq = CommRequest::<T>::new(None,
+    let commreq = CommRequest::<T>::new(None,
                                        Some(dest),
                                        tag,
                                        Some(buf.clone()),
@@ -69,13 +64,11 @@ pub fn mpi_isend<T>(buf: &T,
 }
 
 pub fn mpi_send<T>(buf: &T,
-                   count: u64,
-                   datatype: MPIDatatype,
                    dest: RequestProc,
                    tag: u64,
                    comm: MPIComm)
     where T: 'static + Debug + Clone + Encodable + Decodable + Send
 {
-    let mut rx: Receiver<CommRequest<T>> = mpi_isend(buf, count, datatype, dest, tag, comm);
+    let rx: Receiver<CommRequest<T>> = mpi_isend(buf, dest, tag, comm);
     rx.wait();
 }

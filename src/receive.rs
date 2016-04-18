@@ -1,12 +1,11 @@
-use rustc_serialize::json::{self, ToJson};
+use rustc_serialize::json;
 use libc;
-use mpi_datatype::MPIDatatype;
 use mpi_comm::MPIComm;
 use comm_request::CommRequest;
 use comm_request::CommRequestType;
 use comm_request::RequestProc;
 use comm_request::MType;
-use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc::{Receiver};
 use std::sync::mpsc::channel;
 use std::thread;
 use receiver_traits::Message;
@@ -18,8 +17,6 @@ use std::net::TcpStream;
 
 // Functions in the Receive module
 pub fn mpi_irecv<T>(buf: &mut T,
-                    count: u64,
-                    datatype: MPIDatatype,
                     src: RequestProc,
                     tag: u64,
                     comm: MPIComm)
@@ -28,12 +25,12 @@ pub fn mpi_irecv<T>(buf: &mut T,
 {
 
     let pid = unsafe { libc::getpid() } as u32;
-    let mut commreq = CommRequest::<u32>::new(Some(src),
-                                              None,
-                                              tag,
-                                              None,
-                                              CommRequestType::Message(MType::MRecv),
-                                              pid);
+    let commreq = CommRequest::<u32>::new(Some(src),
+                                          None,
+                                          tag,
+                                          None,
+                                          CommRequestType::Message(MType::MRecv),
+                                          pid);
     let commreq_json = json::encode(&commreq).unwrap();
     // create channel
     let (tx, rx) = channel::<CommRequest<T>>();
@@ -67,14 +64,12 @@ pub fn mpi_irecv<T>(buf: &mut T,
 }
 
 pub fn mpi_recv<T>(buf: &mut T,
-                   count: u64,
-                   datatype: MPIDatatype,
                    src: RequestProc,
                    tag: u64,
                    comm: MPIComm)
     where T: 'static + Debug + Clone + Encodable + Decodable + Send
 {
 
-    let mut rx: Receiver<CommRequest<T>> = mpi_irecv(buf, count, datatype, src, tag, comm);
+    let rx: Receiver<CommRequest<T>> = mpi_irecv(buf, src, tag, comm);
     *buf = rx.wait().expect("No data!");
 }

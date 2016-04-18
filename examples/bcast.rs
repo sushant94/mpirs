@@ -4,11 +4,8 @@ extern crate libc;
 
 use std::fmt;
 
-use mpirs::{comm_rank, num_procs, send, receive, mpi_datatype, init, finalize, bcast};
-use mpirs::comm_request::RequestProc;
+use mpirs::{comm_rank, init, finalize, bcast};
 use mpirs::mpi_comm::MPI_COMM_WORLD;
-
-const TAG: u64 = 42;
 
 #[derive(Debug, Clone, RustcDecodable, RustcEncodable)]
 struct Token {
@@ -27,10 +24,9 @@ fn main() {
     }
 
     let rank = comm_rank::mpi_comm_rank();
-    let size = num_procs::mpi_get_num_procs();
     let mut token = Token { val: 65 };
 
-    bcast::mpi_bcast(&mut token, 1, mpi_datatype::MPIDatatype::Int, 0, MPI_COMM_WORLD);
+    bcast::mpi_bcast(&mut token, 1, MPI_COMM_WORLD);
 
     println!("Process {} has token {}", rank, token);
     finalize::mpi_finalize();

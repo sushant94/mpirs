@@ -1,6 +1,6 @@
 extern crate mpirs;
 
-use mpirs::{comm_rank, send, receive, mpi_datatype};
+use mpirs::{comm_rank, send, receive, finalize};
 use mpirs::comm_request::RequestProc;
 use mpirs::mpi_comm::MPI_COMM_WORLD;
 
@@ -11,16 +11,12 @@ fn main() {
     if rank == 0 {
         let mut message = format!("ping!");
         send::mpi_send(&message,
-                       message.len() as u64,
-                       mpi_datatype::MPIDatatype::Int,
                        RequestProc::Process(1),
                        TAG,
                        MPI_COMM_WORLD);
         println!("Ping Sent!");
         message = String::new();
         receive::mpi_recv(&mut message,
-                          0,
-                          mpi_datatype::MPIDatatype::Int,
                           RequestProc::Process(1),
                           TAG,
                           MPI_COMM_WORLD);
@@ -28,19 +24,16 @@ fn main() {
     } else {
         let mut message = String::new();
         receive::mpi_recv(&mut message,
-                          0,
-                          mpi_datatype::MPIDatatype::Int,
                           RequestProc::Process(0),
                           TAG,
                           MPI_COMM_WORLD);
         println!("Hey! I got {}", message);
         message = "pong".to_owned();
         send::mpi_send(&message,
-                       message.len() as u64,
-                       mpi_datatype::MPIDatatype::Int,
                        RequestProc::Process(0),
                        TAG,
                        MPI_COMM_WORLD);
         println!("Pong sent!");
     }
+    finalize::mpi_finalize();
 }
