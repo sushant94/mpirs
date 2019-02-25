@@ -2,6 +2,7 @@
 
 extern crate rustc_serialize;
 extern crate libc;
+extern crate serde;
 
 pub mod mpi_datatype;
 pub mod mpi_comm;

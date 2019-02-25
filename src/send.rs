@@ -1,5 +1,3 @@
-use rustc_serialize::json;
-use libc;
 use mpi_comm::MPIComm;
 use comm_request::CommRequest;
 use comm_request::CommRequestType;
@@ -10,12 +8,11 @@ use std::sync::mpsc::channel;
 use std::thread;
 use receiver_traits::Message;
 use std::fmt::Debug;
-use rustc_serialize::Encodable;
-use rustc_serialize::Decodable;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use utils;
-
 
 // Functions in the Send module
 pub fn mpi_isend<T>(buf: &T,
@@ -23,7 +20,7 @@ pub fn mpi_isend<T>(buf: &T,
                     tag: u64,
                     comm: MPIComm)
                     -> Receiver<CommRequest<T>>
-    where T: 'static + Debug + Clone + Encodable + Decodable + Send
+    where T: 'static + Debug + Clone + Serialize + DeserializeOwned + Send
 {
     let pid = utils::pid();
     let commreq = CommRequest::<T>::new(None,
@@ -32,14 +29,14 @@ pub fn mpi_isend<T>(buf: &T,
                                        Some(buf.clone()),
                                        CommRequestType::Message(MType::MSend),
                                        pid);
-    let commreq_json = json::encode(&commreq).unwrap();
+    let commreq_json = bincode::serialize(&commreq).unwrap();
     // create channel
     let (tx, rx) = channel::<CommRequest<T>>();
     // spawn thread
     thread::spawn(move || {
         // in thread tcpstream connect, write and read
         let mut stream = TcpStream::connect("127.0.0.1:31337").unwrap();
-        let _ = stream.write(&commreq_json.as_bytes());
+        let _ = stream.write(&commreq_json);
         let mut bytes_read = [0; 2048];
         let mut str_in = String::new();
 
@@ -55,7 +52,7 @@ pub fn mpi_isend<T>(buf: &T,
         }
 
         if !str_in.is_empty() {
-            tx.send(json::decode(&str_in).expect("Invalid json"));
+            tx.send(bincode::deserialize(str_in.as_bytes()).expect("Invalid json"));
         }
 
     });
@@ -68,7 +65,7 @@ pub fn mpi_send<T>(buf: &T,
                    dest: RequestProc,
                    tag: u64,
                    comm: MPIComm)
-    where T: 'static + Debug + Clone + Encodable + Decodable + Send
+    where T: 'static + Debug + Clone + Serialize + DeserializeOwned + Send
 {
     let rx: Receiver<CommRequest<T>> = mpi_isend(buf, dest, tag, comm);
     rx.wait();

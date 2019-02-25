@@ -3,12 +3,12 @@
 //! `CommRequest` is the final structure that encloses the data to be sent within a struct that
 //! contains meta-data required for effective communication.
 
-use rustc_serialize::{Encodable, Decodable, json};
+use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
 /// Differentiate between communications and simlpe requests
-#[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum CommRequestType {
     /// Message from one process to another
     Message(MType),
@@ -16,14 +16,14 @@ pub enum CommRequestType {
     Control(ControlTy),
 }
 
-#[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum MType {
     MSend,
     MRecv,
 }
 
 /// Information requested from mpirun
-#[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum ControlTy {
     /// Get rank of the process in the communicator
     GetMyRank,
@@ -36,7 +36,7 @@ pub enum ControlTy {
     Barrier,
 }
 
-#[derive(Debug, Copy, Clone, RustcEncodable, RustcDecodable, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum RequestProc {
     /// Basic point-to-point message send / recv
     Process(usize),
@@ -44,8 +44,8 @@ pub enum RequestProc {
     Any,
 }
 
-#[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
-pub struct CommRequest<T: Debug + Clone + Encodable + Decodable> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommRequest<T: Debug + Clone + Serialize + DeserializeOwned> {
     /// Filled in by mpirun automatically. Not set by the sending process
     src: Option<RequestProc>,
     dest: Option<RequestProc>,
@@ -53,13 +53,13 @@ pub struct CommRequest<T: Debug + Clone + Encodable + Decodable> {
     tag: u64,
     pty: PhantomData<T>,
     /// Actual data to be sent
-    data: Option<String>,
+    data: Option<Vec<u8>>,
     /// Type of request
     req_ty: CommRequestType,
     pid: u32,
 }
 
-impl<T: Debug + Clone + Encodable + Decodable> CommRequest<T> {
+impl<T: Debug + Clone + Serialize + DeserializeOwned> CommRequest<T> {
     pub fn new(src: Option<RequestProc>,
                dest: Option<RequestProc>,
                tag: u64,
@@ -68,7 +68,7 @@ impl<T: Debug + Clone + Encodable + Decodable> CommRequest<T> {
                pid: u32)
                -> CommRequest<T> {
         let json_data = if data.is_some() {
-            json::encode(data.as_ref().unwrap()).ok()
+            bincode::serialize(data.as_ref().unwrap()).ok()
         } else {
             None
         };
@@ -96,7 +96,7 @@ impl<T: Debug + Clone + Encodable + Decodable> CommRequest<T> {
         self.tag
     }
 
-    pub fn data(&self) -> Option<String> {
+    pub fn data(&self) -> Option<Vec<u8>> {
         self.data.clone()
     }
 
@@ -166,10 +166,10 @@ pub trait Extract {
     fn data(&self) -> Option<Self::DType>;
 }
 
-impl<T: Clone + Debug + Encodable + Decodable> Extract for CommRequest<T> {
+impl<T: Clone + Debug + Serialize + DeserializeOwned> Extract for CommRequest<T> {
     type DType = T;
     fn data(&self) -> Option<Self::DType> {
-        let x: Option<T> = json::decode(self.data.as_ref().unwrap()).ok();
+        let x: Option<T> = bincode::deserialize(self.data.as_ref().unwrap()).ok();
         x
     }
 }

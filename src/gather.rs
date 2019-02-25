@@ -1,9 +1,8 @@
-use rustc_serialize::json;
-use rustc_serialize::Decodable;
+use serde::de::DeserializeOwned;
 use mpi_comm::MPIComm;
 use comm_request::RequestProc;
 use std::fmt::Debug;
-use rustc_serialize::Encodable;
+use serde::Serialize;
 use send::mpi_send;
 use receive::mpi_recv;
 use comm_rank::mpi_comm_rank;
@@ -13,7 +12,7 @@ use std::u64;
 // Functions in the Gather module
 pub fn mpi_gatherv<T>(sendbuf: &mut T, recvbuf: &mut Vec<T>, 
 			 recvcount: Vec<usize>, displs: Vec<usize>, root: usize, comm: MPIComm) 
-			 where T: 'static + Debug + Clone + Encodable + Decodable + Send {
+			 where T: 'static + Debug + Clone + Serialize + DeserializeOwned + Send {
 
 		let n = mpi_get_num_procs();
 		let tag = u64::MAX;
@@ -26,7 +25,7 @@ pub fn mpi_gatherv<T>(sendbuf: &mut T, recvbuf: &mut Vec<T>,
 			for i in 0..n {
 					let mut buf_str: String = String::new();
 			    mpi_recv(&mut buf_str, RequestProc::Process(i), tag, comm);
-			    let buf: Vec<T> = json::decode(&buf_str).unwrap();
+			    let buf: Vec<T> = bincode::deserialize(buf_str.as_bytes()).unwrap();
 
 			    if buf.len() != recvcount[i] {
 			    	panic!("Received more than specified buffer size");

@@ -1,4 +1,3 @@
-use rustc_serialize::json;
 use comm_request::CommRequest;
 use comm_request::CommRequestType;
 use comm_request::ControlTy;
@@ -15,8 +14,8 @@ pub fn mpi_finalize() {
                                           None,
                                           CommRequestType::Control(ControlTy::Exit),
                                           pid);
-    let commreq_json = json::encode(&commreq).unwrap();
+    let commreq_json = bincode::serialize(&commreq).unwrap();
 
     let mut stream = TcpStream::connect("127.0.0.1:31337").unwrap();
-    let _ = stream.write(&commreq_json.as_bytes());
+    let _ = stream.write(&commreq_json);
 }

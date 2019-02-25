@@ -1,5 +1,3 @@
-use rustc_serialize::json;
-use libc;
 use comm_request::CommRequest;
 use comm_request::CommRequestType;
 use comm_request::ControlTy;
@@ -12,10 +10,10 @@ pub fn mpi_get_num_procs() -> usize {
 	  let tag:u64 = u64::max_value();
 	  let mut np:Option<usize> = None;
 		let commreq = CommRequest::<u32>::new(None, None, tag, None, CommRequestType::Control(ControlTy::NumProcs), pid);
-		let commreq_json = json::encode(&commreq).unwrap();
+		let commreq_json = bincode::serialize(&commreq).unwrap();
 		
 		let mut stream = TcpStream::connect("127.0.0.1:31337").unwrap();
-		let _ = stream.write(&commreq_json.as_bytes());
+		let _ = stream.write(&commreq_json);
 		let mut bytes_read = [0; 2048];
 		let mut str_in = String::new();
 
