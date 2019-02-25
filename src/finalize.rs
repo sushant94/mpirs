@@ -14,8 +14,8 @@ pub fn mpi_finalize() {
                                           None,
                                           CommRequestType::Control(ControlTy::Exit),
                                           pid);
-    let commreq_json = bincode::serialize(&commreq).unwrap();
+    let commreq_serialized = bincode::serialize(&commreq).unwrap();
 
     let mut stream = TcpStream::connect("127.0.0.1:31337").unwrap();
-    let _ = stream.write(&commreq_json);
+    let _ = stream.write(&commreq_serialized);
 }

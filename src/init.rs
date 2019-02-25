@@ -18,8 +18,8 @@ pub fn mpi_init() {
                                                   CommRequestType::Control(ControlTy::Nop),
                                                   pid);
 
-            let commreq_json = bincode::serialize(&commreq).unwrap();
-            let _ = stream.write(&commreq_json);
+            let commreq_serialized = bincode::serialize(&commreq).unwrap();
+            let _ = stream.write(&commreq_serialized);
             break;
         }
         unsafe {

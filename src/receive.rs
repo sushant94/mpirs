@@ -30,14 +30,14 @@ pub fn mpi_irecv<T>(buf: &mut T,
                                           None,
                                           CommRequestType::Message(MType::MRecv),
                                           pid);
-    let commreq_json = bincode::serialize(&commreq).unwrap();
+    let commreq_serialized = bincode::serialize(&commreq).unwrap();
     // create channel
     let (tx, rx) = channel::<CommRequest<T>>();
     // spawn thread
     thread::spawn(move || {
         // in thread tcpstream connect, write and read
         let mut stream = TcpStream::connect("127.0.0.1:31337").unwrap();
-        let _ = stream.write(&commreq_json);
+        let _ = stream.write(&commreq_serialized);
         let mut bytes_read = [0; 2048];
         let mut str_in = String::new();
 
