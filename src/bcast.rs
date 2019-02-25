@@ -1,8 +1,8 @@
-use rustc_serialize::Decodable;
+use serde::de::DeserializeOwned;
 use mpi_comm::MPIComm;
 use comm_request::RequestProc;
 use std::fmt::Debug;
-use rustc_serialize::Encodable;
+use serde::Serialize;
 use send::mpi_send;
 use receive::mpi_recv;
 use comm_rank::mpi_comm_rank;
@@ -10,7 +10,7 @@ use num_procs::mpi_get_num_procs;
 
 // Functions in the Broadcast module
 pub fn mpi_bcast<T>(buf: &mut T, root: usize, comm: MPIComm)
-    where T: 'static + Debug + Clone + Encodable + Decodable + Send
+    where T: 'static + Debug + Clone + Serialize + DeserializeOwned + Send
 {
     let n = mpi_get_num_procs();;
     let tag = u64::max_value();

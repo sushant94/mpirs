@@ -1,5 +1,4 @@
 //! Implements mpi_barrier
-use rustc_serialize::json;
 use comm_request::CommRequest;
 use comm_request::CommRequestType;
 use comm_request::ControlTy;
@@ -17,9 +16,9 @@ pub fn mpi_barrier() {
                                           CommRequestType::Control(ControlTy::Barrier),
                                           pid);
 
-    let commreq_json = json::encode(&commreq).expect("Cannot encode to json");
+    let commreq_serialized = bincode::serialize(&commreq).expect("Cannot encode to json");
     let mut stream = TcpStream::connect("127.0.0.1:31337").unwrap();
-    let _ = stream.write(&commreq_json.as_bytes());
+    let _ = stream.write(&commreq_serialized);
 
     // Discard the ACK
     let _ = utils::read_stream(&mut stream);

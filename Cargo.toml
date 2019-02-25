@@ -9,9 +9,12 @@ name = "mpirun"
 path = "mpirun/main.rs"
 
 [dependencies]
-docopt = "0.6"
+docopt = "*"
 rustc-serialize = "*"
 libc = "*"
+serde = { version = "*", features = ["derive"] }
+serde_derive = "*"
+bincode = "*"
 
 [profile.release]
 opt-level = 3

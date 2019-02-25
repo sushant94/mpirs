@@ -1,5 +1,3 @@
-use rustc_serialize::json;
-use libc;
 use comm_request::CommRequest;
 use comm_request::CommRequestType;
 use comm_request::ControlTy;
@@ -17,10 +15,10 @@ pub fn mpi_comm_rank() -> usize {
                                           None,
                                           CommRequestType::Control(ControlTy::GetMyRank),
                                           pid);
-    let commreq_json = json::encode(&commreq).unwrap();
+    let commreq_serialized = bincode::serialize(&commreq).unwrap();
 
     let mut stream = TcpStream::connect("127.0.0.1:31337").unwrap();
-    let _ = stream.write(&commreq_json.as_bytes());
+    let _ = stream.write(&commreq_serialized);
 
     let mut str_in = utils::read_stream(&mut stream);
     if !str_in.is_empty() {
